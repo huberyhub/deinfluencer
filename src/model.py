@@ -65,7 +65,6 @@ class InfluenceDeinfluenceModel:
             self.graph[u][v]['p_ds'] = p_ds
             self.graph[u][v]['p_di'] = p_di
 
-
     def fixed_edge_weights(self, p_is, p_ds, p_di):
         for u, v in self.graph.edges:
             self.graph[u][v]['p_is'] = p_is

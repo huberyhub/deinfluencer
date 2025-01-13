@@ -258,7 +258,7 @@ def select_deinfluencers_cri(k_deinfluencers_ls, model):
         deinfluencers_dict['ExIniInf'] = model.select_deinfluencers_from_not_ini_influencers(k)
         deinfluencers_dict['RkAllInf'] = model.select_deinfluencers_degree_centrality(k)
         deinfluencers_dict['RkIniInf'] = model.select_deinfluencers_from_ini_influencers_degree_centrality(k)
-        deinfluencers_dict['GreedyDeinfAllInf'] = model.select_deinfluencers_from_influencers_greedy(k)
+        #deinfluencers_dict['GreedyDeinfAllInf'] = model.select_deinfluencers_from_influencers_greedy(k)
     
         deinfluencers_list.append((k, deinfluencers_dict))
     return deinfluencers_list
@@ -284,18 +284,6 @@ def select_deinfluencers_greedy(k_deinfluencers_ls, model):
         deinfluencers_dict['Degree'] = model.select_deinfluencers_degree_centrality(k)
         deinfluencers_dict['GreedyDeinf'] = model.greedy_hill_climbing_deinf(k)
         deinfluencers_dict['GreedyInf'] = model.greedy_hill_climbing_deinf_reduce_influence(k)
-    
-        deinfluencers_list.append((k, deinfluencers_dict))
-    return deinfluencers_list
-
-def select_deinfluencers_greedy_reduceinf(k_deinfluencers_ls, model):
-    deinfluencers_list = []
-    for k in k_deinfluencers_ls:
-        deinfluencers_dict = {}
-        # Sample function calls to model object methods
-        deinfluencers_dict['Random'] = model.select_deinfluencers_random(k)
-        deinfluencers_dict['Degree'] = model.select_deinfluencers_degree_centrality(k)
-        deinfluencers_dict['Greedy'] = model.greedy_hill_climbing_deinf_reduce_influence(k)
     
         deinfluencers_list.append((k, deinfluencers_dict))
     return deinfluencers_list

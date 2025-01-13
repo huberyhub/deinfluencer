@@ -140,7 +140,6 @@ class InfluenceDeinfluenceModel:
                             self.active_edges.add(edge)
                             self.attempted_deinfluence.add(edge)
 
-
     def spread_influence(self):
         new_influenced = set()
         new_deinfluenced = set()
@@ -355,7 +354,7 @@ class InfluenceDeinfluenceModel:
    
         return optimized_deinfluencer
 
-    def greedy_hill_climbing_deinf_reduce_influence(self, j, node_list, steps=3, R=3):
+    def greedy_hill_climbing_deinf_reduce_influence(self, j, steps=3, R=3):
         """Select j de-influencers using greedy algorithm to reduce most influence."""
         optimized_deinfluencer = set()
 
@@ -366,7 +365,7 @@ class InfluenceDeinfluenceModel:
             best_candidate = None
             best_score = float('inf')  # Minimize influence
 
-            for node in node_list:
+            for node in original_model.graph.nodes:
                 if node in optimized_deinfluencer:
                     continue
 
@@ -378,11 +377,6 @@ class InfluenceDeinfluenceModel:
                     # Create a fresh copy of the original model for each run
                     model_copy = copy.deepcopy(original_model)
                     model_copy.set_deinfluencers(current_deinfluencers)
-
-                    # Add a check for steps
-                    if steps <= 0:
-                        raise ValueError(f"Invalid number of steps: {steps}")
-
                     model_copy.run_cascade(steps)
                     total_score += model_copy.evaluate_influence()  # We want to minimize influence
 
@@ -396,8 +390,9 @@ class InfluenceDeinfluenceModel:
                 optimized_deinfluencer.add(best_candidate)
                 
         return optimized_deinfluencer
+    
 
-    def greedy_hill_climbing_deinf(self, j, node_list, steps=3, R=3):
+    def greedy_hill_climbing_deinf_restricted(self, j, node_list, steps=3, R=3):
         """Select j de-influencers using greedy algorithm from the provided node_list."""
         optimized_deinfluencer = set()
         original_model = copy.deepcopy(self)

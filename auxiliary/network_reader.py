@@ -3,8 +3,11 @@ import pickle
 import os
 
 # Load the data from the file
-file_path = '/Users/huberyhu/Desktop/SURP/im_deinfluence/network_data/ca-GrQc.txt'
-save_path = '/Users/huberyhu/Desktop/SURP/im_deinfluence/network_data/ca-GrQc.gpickle'
+# Use facebook_combined.txt as the input file for example
+
+file_path = '' # Path to the input file
+
+save_path = '' # Path to save the graph
 
 # Create an empty directed graph
 G = nx.DiGraph()

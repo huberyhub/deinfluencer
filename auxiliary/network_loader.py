@@ -2,7 +2,7 @@ import networkx as nx
 import pickle
 
 # Load the graph from the file
-save_path = '/Users/huberyhu/Desktop/SURP/im_deinfluence/network_data/email_eu_core_graph.gpickle'
+save_path = ''
 try:
     with open(save_path, 'rb') as f:
         G = pickle.load(f)

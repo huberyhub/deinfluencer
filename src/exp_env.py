@@ -136,7 +136,7 @@ def average_results(deinfluencers_list, model, num_runs, steps):
         }
         for k in cumulative_results
     }
-    
+
     return average_results
 
 
@@ -171,6 +171,100 @@ def average_results_simple(deinfluencers_list, model, num_runs, steps):
         for k in cumulative_results
     }
     return average_results
+
+
+def average_results_budget(deinfluencers_list, model, num_runs, steps):
+    """
+    Computes average deinfluenced, influenced, transitions, *and* leftover budget
+    for each (k, method) pair over multiple runs.
+    """
+
+    # 1. Initialize a structure to hold cumulative sums
+    #    We'll store four things now: (sum_deinf, sum_infl, transitions, sum_leftover)
+    cumulative_results = {}
+    for k, deinfluencers_methods in deinfluencers_list:
+        if k not in cumulative_results:
+            cumulative_results[k] = {
+                method: (0, 0, {'I->S': 0, 'D->S': 0, 'D->I': 0}, 0)
+                for method in deinfluencers_methods.keys()
+            }
+    
+    # 2. Perform multiple runs for each (k, method)
+    for k, deinfluencers_methods in deinfluencers_list:
+        for _ in range(num_runs):
+
+            # Shuffle the deinfluencers for budget-based methods
+            # or just reuse them if the method doesn't use a budget.
+            shuffled_deinfluencers_methods = {}
+
+            for method, deinfluencers_info in deinfluencers_methods.items():
+                if method in ['Random', 'High Degree', 'Low Degree']:
+                    # Expect a dict: {'selected_nodes': set(...), 'budget_left': leftover}
+                    shuffle_result = shuffle_deinfluencers(model, k, deinfluencers_info)
+                    selected_nodes = shuffle_result['selected_nodes']
+                    leftover_budget = shuffle_result['budget_left']
+                else:
+                    # Non-budget methods can remain as a set of nodes
+                    selected_nodes = deinfluencers_info
+                    leftover_budget = 0
+
+                # Now count how many are deinfluenced/influenced, plus transitions
+                final_deinfluenced, final_influenced, transitions = count_deinfluenced(
+                    model, selected_nodes, num_runs, steps
+                )
+
+                # Store a 4-tuple, including leftover budget
+                shuffled_deinfluencers_methods[method] = (
+                    final_deinfluenced,
+                    final_influenced,
+                    transitions,
+                    leftover_budget
+                )
+
+            # 3. Update the cumulative results
+            for method, result in shuffled_deinfluencers_methods.items():
+                # result is a 4-tuple
+                final_deinf, final_infl, transitions, leftover = result
+
+                (sum_deinf, sum_infl, sum_trans, sum_leftover) = cumulative_results[k][method]
+
+                new_deinf = sum_deinf + final_deinf
+                new_infl = sum_infl + final_infl
+                new_trans = {
+                    'I->S': sum_trans['I->S'] + transitions['I->S'],
+                    'D->S': sum_trans['D->S'] + transitions['D->S'],
+                    'D->I': sum_trans['D->I'] + transitions['D->I']
+                }
+                new_leftover = sum_leftover + leftover
+
+                cumulative_results[k][method] = (new_deinf, new_infl, new_trans, new_leftover)
+
+
+    # 4. Compute averages (including leftover budget)
+    average_results = {}
+    for k, method_dict in cumulative_results.items():
+        average_results[k] = {}
+        for method, (sum_deinf, sum_infl, sum_trans, sum_leftover) in method_dict.items():
+            avg_deinf = sum_deinf / num_runs
+            avg_infl = sum_infl / num_runs
+            avg_trans = {
+                'I->S': sum_trans['I->S'] / num_runs,
+                'D->S': sum_trans['D->S'] / num_runs,
+                'D->I': sum_trans['D->I'] / num_runs
+            }
+            avg_leftover = sum_leftover / num_runs
+
+            # We return four items for each method:
+            # (average deinfluenced, average influenced, average transitions, average leftover budget)
+            average_results[k][method] = (
+                avg_deinf,
+                avg_infl,
+                avg_trans,
+                avg_leftover
+            )
+
+    return average_results
+
 
 def average_results_without_shuffle(deinfluencers_list, model, num_runs, steps):
     cumulative_results = {}
@@ -325,22 +419,73 @@ def select_deinfluencers_budget(budget_ls, model, type):
 
 def select_deinfluencers_budget_naive(budget_ls, model, type):
     deinfluencers_list = []
+    
     for budget in budget_ls:
-        deinfluencers_dict = {}
-        # Sample function calls to model object methods
-        deinfluencers_dict['Random'] = choose_random_nodes_until_budget_naive(model.graph,budget,type)
-        deinfluencers_dict['High Degree'] = choose_highest_degree_nodes_until_budget_naive(model.graph,budget,type)
-        deinfluencers_dict['Low Degree'] = choose_lowest_degree_nodes_until_budget_naive(model.graph,budget,type)
+        # We'll build a dict with each method, 
+        # where each method gives us a dict of { 'selected_nodes': ..., 'budget_left': ... }
+        deinfluencers_dict_budget_left = {}
 
-        deinfluencers_list.append((budget, deinfluencers_dict))
+        # Random
+        random_selected, random_budget_left = choose_random_nodes_until_budget_naive(
+            model.graph, budget, type, return_budget_left=True
+        )
+        deinfluencers_dict_budget_left['Random'] = {
+            'selected_nodes': random_selected,
+            'budget_left': random_budget_left
+        }
+
+        # High Degree
+        high_degree_selected, high_degree_budget_left = choose_highest_degree_nodes_until_budget_naive(
+            model.graph, budget, type, return_budget_left=True
+        )
+        deinfluencers_dict_budget_left['High Degree'] = {
+            'selected_nodes': high_degree_selected,
+            'budget_left': high_degree_budget_left
+        }
+
+        # Low Degree
+        low_degree_selected, low_degree_budget_left = choose_lowest_degree_nodes_until_budget_naive(
+            model.graph, budget, type, return_budget_left=True
+        )
+        deinfluencers_dict_budget_left['Low Degree'] = {
+            'selected_nodes': low_degree_selected,
+            'budget_left': low_degree_budget_left
+        }
+
+        # Append a tuple (budget, deinfluencers_dict_budget_left) 
+        # so we know the total budget plus the selection details
+        deinfluencers_list.append((budget, deinfluencers_dict_budget_left))
+    
     return deinfluencers_list
+
+
 
 """
 Selection Schemes for Costs
 ------------------------------------------------------------------------------------------------------------------------
 """
 
-def choose_highest_degree_nodes_until_budget_naive(graph, budget, type):
+def choose_random_nodes_until_budget_naive(graph, budget, type, return_budget_left=False):
+    selected_nodes = set()
+    nodes = list(graph.nodes)
+    random.shuffle(nodes)
+    current_budget = 0
+    
+    for node in nodes:
+        node_budget = graph.nodes[node][type]
+        if current_budget + node_budget > budget:
+            break
+        selected_nodes.add(node)
+        current_budget += node_budget
+
+    if return_budget_left:
+        budget_left = budget - current_budget
+        return selected_nodes, budget_left
+    else:
+        return selected_nodes
+
+
+def choose_highest_degree_nodes_until_budget_naive(graph, budget, type, return_budget_left=False):
     selected_nodes = set()
     sorted_nodes = sorted(graph.nodes, key=lambda node: graph.degree(node), reverse=True)
     current_budget = 0
@@ -352,32 +497,30 @@ def choose_highest_degree_nodes_until_budget_naive(graph, budget, type):
         selected_nodes.add(node)
         current_budget += node_budget
     
-    return selected_nodes
+    if return_budget_left:
+        budget_left = budget - current_budget
+        return selected_nodes, budget_left
+    else:
+        return selected_nodes
 
-def choose_random_nodes_until_budget_naive(graph, budget, type):
-    selected_nodes = set()
-    nodes = list(graph.nodes)
-    random.shuffle(nodes)
-    current_budget = 0
-    for node in nodes:
-        node_budget = graph.nodes[node][type]
-        if current_budget + node_budget > budget:
-            break
-        selected_nodes.add(node)
-        current_budget += node_budget
-    return selected_nodes
 
-def choose_lowest_degree_nodes_until_budget_naive(graph, budget, type):
+def choose_lowest_degree_nodes_until_budget_naive(graph, budget, type, return_budget_left=False):
     selected_nodes = set()
-    sorted_nodes = sorted(graph.nodes, key=lambda node: graph.degree(node), reverse=False)
+    sorted_nodes = sorted(graph.nodes, key=lambda node: graph.degree(node))
     current_budget = 0
+    
     for node in sorted_nodes:
         node_budget = graph.nodes[node][type]
         if current_budget + node_budget > budget:
             break
         selected_nodes.add(node)
         current_budget += node_budget
-    return selected_nodes
+    
+    if return_budget_left:
+        budget_left = budget - current_budget
+        return selected_nodes, budget_left
+    else:
+        return selected_nodes
 
 
 def choose_highest_degree_nodes_until_budget(graph, budget, type):
@@ -671,7 +814,6 @@ def plot_deinfluencer_results_exp1(results, G, graph_type, num_nodes, num_edges,
     plt.show()
 
 
-
 def plot_deinfluencer_results_exp2(results, G):
     """
     Plot the effectiveness of deinfluencers by selection method and budget.
@@ -721,6 +863,95 @@ def plot_deinfluencer_results_exp2(results, G):
 
     plt.tight_layout()
     plt.show()
+
+
+def plot_deinfluencer_results_budget(results, G):
+    """
+    Plot the effectiveness of deinfluencers by selection method and budget,
+    including leftover budget as a new subplot.
+
+    Parameters:
+    - results: A dictionary where keys are budgets (k values) and values are dictionaries
+               of methods with their corresponding final results in a 4-tuple:
+                 (final_deinfluenced, final_influenced, transitions_dict, leftover_budget)
+    - G: The graph object containing the nodes.
+    """
+    # Create 4 subplots:
+    #  0) Final Deinfluencers count
+    #  1) Final Influencers count
+    #  2) Final Susceptibles count
+    #  3) Leftover Budget
+    fig, axs = plt.subplots(4, 1, figsize=(9, 16))
+    
+    # To avoid overlapping subplots
+    plt.tight_layout(rect=[0, 0, 1, 0.95])
+
+    # We'll get the list of methods from the first entry in results
+    methods = list(next(iter(results.values())).keys())
+    # Sort the budget values
+    k_values = sorted(results.keys())
+    
+    total_nodes = len(G.nodes)
+
+    # 1. Plot final deinfluenced, influenced, and susceptible counts (first 3 subplots)
+    for method in methods:
+        deinfluenced_nodes = []
+        influenced_nodes = []
+        susceptible_nodes = []
+        leftover_budgets = []
+
+        for k in k_values:
+            # Here, results[k][method] = (final_deinfluenced, final_influenced, transitions, leftover_budget)
+            final_deinf = results[k][method][0]
+            final_infl = results[k][method][1]
+            leftover = results[k][method][3]   # leftover budget
+
+            deinfluenced_nodes.append(final_deinf)
+            influenced_nodes.append(final_infl)
+            susceptible_nodes.append(total_nodes - (final_infl + final_deinf))
+            leftover_budgets.append(leftover)
+        
+        # Plot each quantity
+        axs[0].plot(k_values, deinfluenced_nodes, label=method, linewidth=3)
+        axs[1].plot(k_values, influenced_nodes, label=method, linewidth=3)
+        axs[2].plot(k_values, susceptible_nodes, label=method, linewidth=3)
+        # Plot leftover budget (4th subplot)
+        axs[3].plot(k_values, leftover_budgets, label=method, linewidth=3)
+
+    # 2. Configure each subplot
+    # Subplot 0: final deinfluencers
+    axs[0].set_ylabel('Final Deinfluencers Count', fontsize=13)
+    axs[0].tick_params(axis='both', which='major', labelsize=13)
+    axs[0].xaxis.set_major_locator(ticker.MaxNLocator(integer=True))
+    axs[0].yaxis.set_major_locator(ticker.MaxNLocator(integer=True))
+    axs[0].legend(loc='center left', bbox_to_anchor=(1, 0.5))
+
+    # Subplot 1: final influencers
+    axs[1].set_ylabel('Final Influencers Count', fontsize=13)
+    axs[1].tick_params(axis='both', which='major', labelsize=13)
+    axs[1].xaxis.set_major_locator(ticker.MaxNLocator(integer=True))
+    axs[1].yaxis.set_major_locator(ticker.MaxNLocator(integer=True))
+    axs[1].legend(loc='center left', bbox_to_anchor=(1, 0.5))
+
+    # Subplot 2: final susceptibles
+    axs[2].set_ylabel('Final Susceptibles Count', fontsize=13)
+    axs[2].tick_params(axis='both', which='major', labelsize=13)
+    axs[2].xaxis.set_major_locator(ticker.MaxNLocator(integer=True))
+    axs[2].yaxis.set_major_locator(ticker.MaxNLocator(integer=True))
+    axs[2].legend(loc='center left', bbox_to_anchor=(1, 0.5))
+
+    # Subplot 3: leftover budget
+    axs[3].set_ylabel('Leftover Budget', fontsize=13)
+    axs[3].set_xlabel('Number of Initial Deinfluencers Selected', fontsize=14)
+    axs[3].tick_params(axis='both', which='major', labelsize=13)
+    axs[3].xaxis.set_major_locator(ticker.MaxNLocator(integer=True))
+    axs[3].yaxis.set_major_locator(ticker.MaxNLocator(integer=True))
+    axs[3].legend(loc='center left', bbox_to_anchor=(1, 0.5))
+
+    # Adjust final layout and show
+    plt.tight_layout()
+    plt.show()
+
 
 
 def plot_cascade_results(influencer_counts, deinfluencer_counts, susceptible_counts):

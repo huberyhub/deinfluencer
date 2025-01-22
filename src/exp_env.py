@@ -419,7 +419,6 @@ def select_deinfluencers_budget(budget_ls, model, type):
 
 def select_deinfluencers_budget_naive(budget_ls, model, type):
     deinfluencers_list = []
-    
     for budget in budget_ls:
         # We'll build a dict with each method, 
         # where each method gives us a dict of { 'selected_nodes': ..., 'budget_left': ... }
@@ -812,6 +811,7 @@ def plot_deinfluencer_results_exp1(results, G, graph_type, num_nodes, num_edges,
 
     plt.tight_layout()
     plt.show()
+
 
 
 def plot_deinfluencer_results_exp2(results, G):

@@ -16,7 +16,6 @@ class InfluenceDeinfluenceModel:
         :param seed: Optional random seed for reproducibility
         """
         self.graph = graph
-        self.rng = random.Random(seed)  # local RNG with optional seed
         self.edge_weights(edge_weights_type, c)
         self.set_initial_states()
         self.activated_edges = set()
@@ -58,9 +57,9 @@ class InfluenceDeinfluenceModel:
 
     def random_edge_weights(self):
         for u, v in self.graph.edges:
-            p_is = self.rng.uniform(0, 1)     # was random.uniform(0, 1)
-            p_ds = self.rng.uniform(0, 1)
-            p_di = self.rng.uniform(0, 1)
+            p_is = random.uniform(0, 1)
+            p_ds = random.uniform(0, 1)
+            p_di = random.uniform(0, 1)
             self.graph[u][v]['p_is'] = p_is
             self.graph[u][v]['p_ds'] = p_ds
             self.graph[u][v]['p_di'] = p_di
@@ -92,53 +91,28 @@ class InfluenceDeinfluenceModel:
             self.graph.nodes[node]['state'] = 'D'
 
     def pre_determine_active_edges(self):
-        """
-        Identifies and marks edges that are active in the current iteration.
-
-        For each node:
-        - If the node is 'I' (influencer), it attempts to influence its 'S' neighbors
-            with probability p_is (stored in graph[u][v]['p_is']).
-        - If the node is 'D' (deinfluencer), it attempts to:
-            * deinfluence 'S' neighbors with probability p_ds, or
-            * convert 'I' neighbors to 'D' with probability p_di.
-
-        This method updates:
-        - self.active_edges: set of edges that will attempt influence or deinfluence
-        - self.attempted_influence / self.attempted_deinfluence: track which edges
-            have already attempted an action, preventing repeated attempts.
-        """
         self.active_edges = set()
-        
         for node in self.graph.nodes:
-            node_state = self.graph.nodes[node]['state']
-
-            if node_state == 'I':
-                # Node is an influencer
+            if self.graph.nodes[node]['state'] == 'I':
                 for neighbor in self.graph.neighbors(node):
-                    edge = tuple(sorted((node, neighbor)))  # canonical form
-                    if (self.graph.nodes[neighbor]['state'] == 'S'
-                        and self.rng.random() < self.graph[node][neighbor]['p_is']
-                        and edge not in self.attempted_influence):
+                    edge = (node, neighbor)
+                    if (self.graph.nodes[neighbor]['state'] == 'S' and 
+                        random.random() < self.graph[node][neighbor]['p_is'] and
+                        edge not in self.attempted_influence):
                         self.active_edges.add(edge)
-                        self.attempted_influence.add(edge)
-
-            elif node_state == 'D':
-                # Node is a deinfluencer
+                        self.attempted_influence.add(edge)  # Mark edge as having attempted influence
+            elif self.graph.nodes[node]['state'] == 'D':
                 for neighbor in self.graph.neighbors(node):
-                    edge = tuple(sorted((node, neighbor)))  # canonical form
-                    neighbor_state = self.graph.nodes[neighbor]['state']
-
-                    # Deinfluence an 'S' neighbor
-                    if neighbor_state == 'S' and self.rng.random() < self.graph[node][neighbor]['p_ds']:
+                    edge = (node, neighbor)
+                    if self.graph.nodes[neighbor]['state'] == 'S' and random.random() < self.graph[node][neighbor]['p_ds']:
                         if edge not in self.attempted_deinfluence:
                             self.active_edges.add(edge)
-                            self.attempted_deinfluence.add(edge)
-                    # Convert an 'I' neighbor to 'D'
-                    elif neighbor_state == 'I' and self.rng.random() < self.graph[node][neighbor]['p_di']:
+                            self.attempted_deinfluence.add(edge)  # Mark edge as having attempted deinfluence
+                    elif self.graph.nodes[neighbor]['state'] == 'I' and random.random() < self.graph[node][neighbor]['p_di']:
                         if edge not in self.attempted_deinfluence:
                             self.active_edges.add(edge)
-                            self.attempted_deinfluence.add(edge)
-
+                            self.attempted_deinfluence.add(edge)  # Mark edge as having attempted deinfluence
+                            
     def spread_influence(self):
         new_influenced = set()
         new_deinfluenced = set()
@@ -227,10 +201,11 @@ class InfluenceDeinfluenceModel:
         return sum(1 for node in self.graph.nodes if self.graph.nodes[node]['state'] == 'S')
     
     def random_influencers(self, k):
-        return set(self.rng.sample(list(self.graph.nodes), k))
+        return set(random.sample(list(self.graph.nodes), k))
     
     def random_deinfluencers(self, k):
-        return set(self.rng.sample(list(self.graph.nodes), k))
+        return set(random.sample(list(self.graph.nodes), k))
+
     
     def reset_graph(self):
         self.set_initial_states()

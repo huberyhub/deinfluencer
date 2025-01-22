@@ -198,7 +198,7 @@ def average_results_budget(deinfluencers_list, model, num_runs, steps):
             shuffled_deinfluencers_methods = {}
 
             for method, deinfluencers_info in deinfluencers_methods.items():
-                if method in ['Random', 'High Degree', 'Low Degree']:
+                if method in ['Random', 'High Degree', 'Low Degree', 'Ratio']:
                     # Expect a dict: {'selected_nodes': set(...), 'budget_left': leftover}
                     shuffle_result = shuffle_deinfluencers(model, k, deinfluencers_info)
                     selected_nodes = shuffle_result['selected_nodes']
@@ -413,6 +413,7 @@ def select_deinfluencers_budget(budget_ls, model, type):
         deinfluencers_dict['Random'] = choose_random_nodes_until_budget(model.graph,budget,type)
         deinfluencers_dict['High Degree'] = choose_highest_degree_nodes_until_budget(model.graph,budget,type)
         deinfluencers_dict['Low Degree'] = choose_lowest_degree_nodes_until_budget(model.graph,budget,type)
+        deinfluencers_dict['Ratio'] = choose_nodes_by_neighbors_cost_ratio_until_budget(model.graph,budget,type)
 
         deinfluencers_list.append((budget, deinfluencers_dict))
     return deinfluencers_list
@@ -584,6 +585,42 @@ def choose_lowest_degree_nodes_until_budget(graph, budget, type):
                     current_budget += node_budget
                 if current_budget == budget:
                     break
+    return selected_nodes
+
+
+def choose_nodes_by_neighbors_cost_ratio_until_budget(graph, budget, cost_attr):
+    # Collect (node, ratio) for all nodes, where ratio = sum_of_neighbor_costs / node_cost
+    ratios = []
+    for node in graph.nodes:
+        node_cost = graph.nodes[node][cost_attr]
+        neighbor_cost_sum = sum(graph.nodes[n][cost_attr] for n in graph.neighbors(node))
+        ratio = neighbor_cost_sum / node_cost if node_cost else float('inf')
+        ratios.append((node, ratio))
+
+    # Sort descending by ratio
+    ratios.sort(key=lambda x: x[1], reverse=True)
+
+    selected_nodes = set()
+    current_budget = 0
+
+    # Pick nodes until reaching budget
+    for node, ratio in ratios:
+        cost_of_node = graph.nodes[node][cost_attr]
+        if current_budget + cost_of_node <= budget:
+            selected_nodes.add(node)
+            current_budget += cost_of_node
+
+    # Check if there is remaining budget
+    if current_budget < budget:
+        for node, ratio in ratios:
+            if node not in selected_nodes:
+                cost_of_node = graph.nodes[node][cost_attr]
+                if current_budget + cost_of_node <= budget:
+                    selected_nodes.add(node)
+                    current_budget += cost_of_node
+                if current_budget == budget:
+                    break
+
     return selected_nodes
 
 """

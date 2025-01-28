@@ -147,7 +147,7 @@ def average_results_simple(deinfluencers_list, model, num_runs, steps):
             cumulative_results[k] = {method: (0, 0, {'I->S': 0, 'D->S': 0, 'D->I': 0}) for method in deinfluencers_methods.keys()}
         
         for _ in range(num_runs):
-            shuffled_deinfluencers_methods = {method: shuffle_deinfluencers(model, k, deinfluencers) if method in ['Random','High Degree', 'Low Degree'] else deinfluencers for method, deinfluencers in deinfluencers_methods.items()}
+            shuffled_deinfluencers_methods = {method: shuffle_deinfluencers(model, k, deinfluencers) if method in ['Random','High Cost', 'Low Cost'] else deinfluencers for method, deinfluencers in deinfluencers_methods.items()}
             results = {
                 method: count_deinfluenced(model, deinfluencers, num_runs, steps)
                 for method, deinfluencers in shuffled_deinfluencers_methods.items()
@@ -198,7 +198,7 @@ def average_results_budget(deinfluencers_list, model, num_runs, steps):
             shuffled_deinfluencers_methods = {}
 
             for method, deinfluencers_info in deinfluencers_methods.items():
-                if method in ['Random', 'High Degree', 'Low Degree', 'Ratio']:
+                if method in ['Random', 'High Cost', 'Low Cost', 'Avg Neighbor Cost']:
                     # Expect a dict: {'selected_nodes': set(...), 'budget_left': leftover}
                     shuffle_result = shuffle_deinfluencers(model, k, deinfluencers_info)
                     selected_nodes = shuffle_result['selected_nodes']
@@ -411,9 +411,9 @@ def select_deinfluencers_budget(budget_ls, model, type):
         deinfluencers_dict = {}
         # Sample function calls to model object methods
         deinfluencers_dict['Random'] = choose_random_nodes_until_budget(model.graph,budget,type)
-        deinfluencers_dict['High Degree'] = choose_highest_degree_nodes_until_budget(model.graph,budget,type)
-        deinfluencers_dict['Low Degree'] = choose_lowest_degree_nodes_until_budget(model.graph,budget,type)
-        deinfluencers_dict['Ratio'] = choose_nodes_by_neighbors_cost_ratio_until_budget(model.graph,budget,type)
+        deinfluencers_dict['High Cost'] = choose_highest_degree_nodes_until_budget(model.graph,budget,type)
+        deinfluencers_dict['Low Cost'] = choose_lowest_degree_nodes_until_budget(model.graph,budget,type)
+        deinfluencers_dict['Avg Neighbor Cost'] = choose_nodes_by_neighbors_cost_ratio_until_budget(model.graph,budget,type)
 
         deinfluencers_list.append((budget, deinfluencers_dict))
     return deinfluencers_list
@@ -434,20 +434,20 @@ def select_deinfluencers_budget_naive(budget_ls, model, type):
             'budget_left': random_budget_left
         }
 
-        # High Degree
+        # High Cost
         high_degree_selected, high_degree_budget_left = choose_highest_degree_nodes_until_budget_naive(
             model.graph, budget, type, return_budget_left=True
         )
-        deinfluencers_dict_budget_left['High Degree'] = {
+        deinfluencers_dict_budget_left['High Cost'] = {
             'selected_nodes': high_degree_selected,
             'budget_left': high_degree_budget_left
         }
 
-        # Low Degree
+        # Low Cost
         low_degree_selected, low_degree_budget_left = choose_lowest_degree_nodes_until_budget_naive(
             model.graph, budget, type, return_budget_left=True
         )
-        deinfluencers_dict_budget_left['Low Degree'] = {
+        deinfluencers_dict_budget_left['Low Cost'] = {
             'selected_nodes': low_degree_selected,
             'budget_left': low_degree_budget_left
         }
@@ -730,7 +730,7 @@ def plot_deinfluencer_results_new(results, G, graph_type, num_nodes, num_edges, 
     for ax in axs[:3]:
         ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         ax.tick_params(axis='both', which='major', labelsize=13)  # Increase tick label font size
-        ax.set_xlabel('Number of Initial Deinfluencers Selected', fontsize=14)
+        ax.set_xlabel('Budget', fontsize=14)
         ax.set_ylabel(ax.get_ylabel(), fontsize=14)
         
         # Set the x and y axes to show integer ticks only
@@ -887,7 +887,7 @@ def plot_deinfluencer_results_exp2(results, G):
     for ax in axs[:3]:
         ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         ax.tick_params(axis='both', which='major', labelsize=13)  # Increase tick label font size
-        ax.set_xlabel('Number of Initial Deinfluencers Selected', fontsize=14)
+        ax.set_xlabel('Budget', fontsize=14)
         ax.set_ylabel(ax.get_ylabel(), fontsize=14)
         
         # Set the x and y axes to show integer ticks only

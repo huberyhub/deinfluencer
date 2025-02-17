@@ -159,6 +159,7 @@ def average_results_simple(deinfluencers_list, model, num_runs, steps):
                     cumulative_results[k][method][1] + result[1],
                     {key: cumulative_results[k][method][2][key] + result[2][key] for key in result[2]}
                 )
+
     average_results = {
         k: {
             method: (
@@ -410,10 +411,25 @@ def select_deinfluencers_budget(budget_ls, model, type):
     for budget in budget_ls:
         deinfluencers_dict = {}
         # Sample function calls to model object methods
-        deinfluencers_dict['Random'] = choose_random_nodes_until_budget(model.graph,budget,type)
-        deinfluencers_dict['High Cost'] = choose_highest_degree_nodes_until_budget(model.graph,budget,type)
-        deinfluencers_dict['Low Cost'] = choose_lowest_degree_nodes_until_budget(model.graph,budget,type)
-        deinfluencers_dict['Avg Neighbor Cost'] = choose_nodes_by_neighbors_cost_ratio_until_budget(model.graph,budget,type)
+        deinfluencers_dict['random selection'] = choose_random_nodes_until_budget(model.graph,budget,type)
+        deinfluencers_dict['decreasing cost'] = choose_highest_degree_nodes_until_budget(model.graph,budget,type)
+        deinfluencers_dict['increasing cost'] = choose_lowest_degree_nodes_until_budget(model.graph,budget,type)
+        deinfluencers_dict['decreasing avg neighbor cost'] = choose_nodes_by_neighbors_cost_descending_ratio_until_budget(model.graph,budget,type)
+        deinfluencers_dict['increasing avg neighbor cost'] = choose_nodes_by_neighbors_cost_ascending_ratio_until_budget(model.graph,budget,type)
+
+        deinfluencers_list.append((budget, deinfluencers_dict))
+    return deinfluencers_list
+
+def select_deinfluencers_naive(budget_ls, model, type):
+    deinfluencers_list = []
+    for budget in budget_ls:
+        deinfluencers_dict = {}
+        # Sample function calls to model object methods
+        deinfluencers_dict['random selection'] = choose_random_nodes_until_budget_naive(model.graph,budget,type)
+        deinfluencers_dict['decreasing cost'] = choose_highest_degree_nodes_until_budget_naive(model.graph,budget,type)
+        deinfluencers_dict['increasing cost'] = choose_lowest_degree_nodes_until_budget_naive(model.graph,budget,type)
+        deinfluencers_dict['decreasing avg neighbor cost'] = choose_nodes_by_neighbors_cost_descending_ratio_until_budget_naive(model.graph,budget,type)
+        deinfluencers_dict['increasing avg neighbor cost'] = choose_nodes_by_neighbors_cost_ascending_ratio_until_budget_naive(model.graph,budget,type)
 
         deinfluencers_list.append((budget, deinfluencers_dict))
     return deinfluencers_list
@@ -429,7 +445,7 @@ def select_deinfluencers_budget_naive(budget_ls, model, type):
         random_selected, random_budget_left = choose_random_nodes_until_budget_naive(
             model.graph, budget, type, return_budget_left=True
         )
-        deinfluencers_dict_budget_left['Random'] = {
+        deinfluencers_dict_budget_left['random selection'] = {
             'selected_nodes': random_selected,
             'budget_left': random_budget_left
         }
@@ -438,7 +454,7 @@ def select_deinfluencers_budget_naive(budget_ls, model, type):
         high_degree_selected, high_degree_budget_left = choose_highest_degree_nodes_until_budget_naive(
             model.graph, budget, type, return_budget_left=True
         )
-        deinfluencers_dict_budget_left['High Cost'] = {
+        deinfluencers_dict_budget_left['decreasing cost'] = {
             'selected_nodes': high_degree_selected,
             'budget_left': high_degree_budget_left
         }
@@ -447,7 +463,7 @@ def select_deinfluencers_budget_naive(budget_ls, model, type):
         low_degree_selected, low_degree_budget_left = choose_lowest_degree_nodes_until_budget_naive(
             model.graph, budget, type, return_budget_left=True
         )
-        deinfluencers_dict_budget_left['Low Cost'] = {
+        deinfluencers_dict_budget_left['increasing cost'] = {
             'selected_nodes': low_degree_selected,
             'budget_left': low_degree_budget_left
         }
@@ -465,7 +481,7 @@ Selection Schemes for Costs
 ------------------------------------------------------------------------------------------------------------------------
 """
 
-def choose_random_nodes_until_budget_naive(graph, budget, type, return_budget_left=False):
+def choose_random_nodes_until_budget_naive(graph, budget, type):
     selected_nodes = set()
     nodes = list(graph.nodes)
     random.shuffle(nodes)
@@ -478,14 +494,10 @@ def choose_random_nodes_until_budget_naive(graph, budget, type, return_budget_le
         selected_nodes.add(node)
         current_budget += node_budget
 
-    if return_budget_left:
-        budget_left = budget - current_budget
-        return selected_nodes, budget_left
-    else:
-        return selected_nodes
+    return selected_nodes
 
 
-def choose_highest_degree_nodes_until_budget_naive(graph, budget, type, return_budget_left=False):
+def choose_highest_degree_nodes_until_budget_naive(graph, budget, type):
     selected_nodes = set()
     sorted_nodes = sorted(graph.nodes, key=lambda node: graph.degree(node), reverse=True)
     current_budget = 0
@@ -497,14 +509,10 @@ def choose_highest_degree_nodes_until_budget_naive(graph, budget, type, return_b
         selected_nodes.add(node)
         current_budget += node_budget
     
-    if return_budget_left:
-        budget_left = budget - current_budget
-        return selected_nodes, budget_left
-    else:
-        return selected_nodes
+    return selected_nodes
 
 
-def choose_lowest_degree_nodes_until_budget_naive(graph, budget, type, return_budget_left=False):
+def choose_lowest_degree_nodes_until_budget_naive(graph, budget, type):
     selected_nodes = set()
     sorted_nodes = sorted(graph.nodes, key=lambda node: graph.degree(node))
     current_budget = 0
@@ -515,34 +523,59 @@ def choose_lowest_degree_nodes_until_budget_naive(graph, budget, type, return_bu
             break
         selected_nodes.add(node)
         current_budget += node_budget
-    
-    if return_budget_left:
-        budget_left = budget - current_budget
-        return selected_nodes, budget_left
-    else:
-        return selected_nodes
 
-
-def choose_highest_degree_nodes_until_budget(graph, budget, type):
-    selected_nodes = set()
-    sorted_nodes = sorted(graph.nodes, key=lambda node: graph.degree(node), reverse=True)
-    current_budget = 0
-    for node in sorted_nodes:
-        node_budget = graph.nodes[node][type]
-        if current_budget + node_budget <= budget:
-            selected_nodes.add(node)
-            current_budget += node_budget
-    # Check if there is remaining budget
-    if current_budget < budget:
-        for node in sorted_nodes:
-            if node not in selected_nodes:
-                node_budget = graph.nodes[node][type]
-                if current_budget + node_budget <= budget:
-                    selected_nodes.add(node)
-                    current_budget += node_budget
-                if current_budget == budget:
-                    break
     return selected_nodes
+    
+def choose_nodes_by_neighbors_cost_descending_ratio_until_budget_naive(graph, budget, cost_attr):
+    # Collect (node, ratio) for all nodes, where ratio = sum_of_neighbor_costs / node_cost
+    ratios = []
+    for node in graph.nodes:
+        node_cost = graph.nodes[node][cost_attr]
+        neighbor_cost_sum = sum(graph.nodes[n][cost_attr] for n in graph.neighbors(node))
+        ratio = neighbor_cost_sum / node_cost if node_cost else float('inf')
+        ratios.append((node, ratio))
+
+    # Sort descending by ratio
+    ratios.sort(key=lambda x: x[1], reverse=True)
+
+    selected_nodes = set()
+    current_budget = 0
+
+    # Pick nodes until reaching budget
+    for node, ratio in ratios:
+        cost_of_node = graph.nodes[node][cost_attr]
+        if current_budget + cost_of_node > budget:
+            break
+        selected_nodes.add(node)
+        current_budget += cost_of_node
+
+    return selected_nodes
+    
+def choose_nodes_by_neighbors_cost_ascending_ratio_until_budget_naive(graph, budget, cost_attr):
+    # Collect (node, ratio) for all nodes, where ratio = sum_of_neighbor_costs / node_cost
+    ratios = []
+    for node in graph.nodes:
+        node_cost = graph.nodes[node][cost_attr]
+        neighbor_cost_sum = sum(graph.nodes[n][cost_attr] for n in graph.neighbors(node))
+        ratio = neighbor_cost_sum / node_cost if node_cost else float('inf')
+        ratios.append((node, ratio))
+
+    # Sort ascending by ratio
+    ratios.sort(key=lambda x: x[1])
+
+    selected_nodes = set()
+    current_budget = 0
+
+    # Pick nodes until reaching budget
+    for node, ratio in ratios:
+        cost_of_node = graph.nodes[node][cost_attr]
+        if current_budget + cost_of_node > budget:
+            break
+        selected_nodes.add(node)
+        current_budget += cost_of_node
+
+    return selected_nodes
+#----------------------------------------------------------------------------------------
 
 def choose_random_nodes_until_budget(graph, budget, type):
     selected_nodes = set()
@@ -557,6 +590,27 @@ def choose_random_nodes_until_budget(graph, budget, type):
     # Check if there is remaining budget
     if current_budget < budget:
         for node in nodes:
+            if node not in selected_nodes:
+                node_budget = graph.nodes[node][type]
+                if current_budget + node_budget <= budget:
+                    selected_nodes.add(node)
+                    current_budget += node_budget
+                if current_budget == budget:
+                    break
+    return selected_nodes
+
+def choose_highest_degree_nodes_until_budget(graph, budget, type):
+    selected_nodes = set()
+    sorted_nodes = sorted(graph.nodes, key=lambda node: graph.degree(node), reverse=True)
+    current_budget = 0
+    for node in sorted_nodes:
+        node_budget = graph.nodes[node][type]
+        if current_budget + node_budget <= budget:
+            selected_nodes.add(node)
+            current_budget += node_budget
+    # Check if there is remaining budget
+    if current_budget < budget:
+        for node in sorted_nodes:
             if node not in selected_nodes:
                 node_budget = graph.nodes[node][type]
                 if current_budget + node_budget <= budget:
@@ -588,7 +642,7 @@ def choose_lowest_degree_nodes_until_budget(graph, budget, type):
     return selected_nodes
 
 
-def choose_nodes_by_neighbors_cost_ratio_until_budget(graph, budget, cost_attr):
+def choose_nodes_by_neighbors_cost_descending_ratio_until_budget(graph, budget, cost_attr):
     # Collect (node, ratio) for all nodes, where ratio = sum_of_neighbor_costs / node_cost
     ratios = []
     for node in graph.nodes:
@@ -622,6 +676,159 @@ def choose_nodes_by_neighbors_cost_ratio_until_budget(graph, budget, cost_attr):
                     break
 
     return selected_nodes
+
+def choose_nodes_by_neighbors_cost_ascending_ratio_until_budget(graph, budget, cost_attr):
+        # Collect (node, ratio) for all nodes, where ratio = sum_of_neighbor_costs / node_cost
+    ratios = []
+    for node in graph.nodes:
+        node_cost = graph.nodes[node][cost_attr]
+        neighbor_cost_sum = sum(graph.nodes[n][cost_attr] for n in graph.neighbors(node))
+        ratio = neighbor_cost_sum / node_cost if node_cost else float('inf')
+        ratios.append((node, ratio))
+
+    # Sort ascending by ratio
+    ratios.sort(key=lambda x: x[1])
+
+    selected_nodes = set()
+    current_budget = 0
+
+    # Pick nodes until reaching budget
+    for node, ratio in ratios:
+        cost_of_node = graph.nodes[node][cost_attr]
+        if current_budget + cost_of_node <= budget:
+            selected_nodes.add(node)
+            current_budget += cost_of_node
+
+    # Check if there is remaining budget
+    if current_budget < budget:
+        for node, ratio in ratios:
+            if node not in selected_nodes:
+                cost_of_node = graph.nodes[node][cost_attr]
+                if current_budget + cost_of_node <= budget:
+                    selected_nodes.add(node)
+                    current_budget += cost_of_node
+                if current_budget == budget:
+                    break
+
+    return selected_nodes
+
+#----------------------------------------------------------------------------------------
+
+def choose_random_nodes_until_budget_naive_arch(graph, budget, type, return_budget_left=False):
+    selected_nodes = set()
+    nodes = list(graph.nodes)
+    random.shuffle(nodes)
+    current_budget = 0
+    
+    for node in nodes:
+        node_budget = graph.nodes[node][type]
+        if current_budget + node_budget > budget:
+            break
+        selected_nodes.add(node)
+        current_budget += node_budget
+
+    if return_budget_left:
+        budget_left = budget - current_budget
+        return selected_nodes, budget_left
+    else:
+        return selected_nodes
+
+
+def choose_highest_degree_nodes_until_budget_naive_arch(graph, budget, type, return_budget_left=False):
+    selected_nodes = set()
+    sorted_nodes = sorted(graph.nodes, key=lambda node: graph.degree(node), reverse=True)
+    current_budget = 0
+    
+    for node in sorted_nodes:
+        node_budget = graph.nodes[node][type]
+        if current_budget + node_budget > budget:
+            break
+        selected_nodes.add(node)
+        current_budget += node_budget
+    
+    if return_budget_left:
+        budget_left = budget - current_budget
+        return selected_nodes, budget_left
+    else:
+        return selected_nodes
+
+
+def choose_lowest_degree_nodes_until_budget_naive_arch(graph, budget, type, return_budget_left=False):
+    selected_nodes = set()
+    sorted_nodes = sorted(graph.nodes, key=lambda node: graph.degree(node))
+    current_budget = 0
+    
+    for node in sorted_nodes:
+        node_budget = graph.nodes[node][type]
+        if current_budget + node_budget > budget:
+            break
+        selected_nodes.add(node)
+        current_budget += node_budget
+    
+    if return_budget_left:
+        budget_left = budget - current_budget
+        return selected_nodes, budget_left
+    else:
+        return selected_nodes
+    
+def choose_nodes_by_neighbors_cost_descending_ratio_until_budget_naive_arch(graph, budget, cost_attr, return_budget_left=False):
+    # Collect (node, ratio) for all nodes, where ratio = sum_of_neighbor_costs / node_cost
+    ratios = []
+    for node in graph.nodes:
+        node_cost = graph.nodes[node][cost_attr]
+        neighbor_cost_sum = sum(graph.nodes[n][cost_attr] for n in graph.neighbors(node))
+        ratio = neighbor_cost_sum / node_cost if node_cost else float('inf')
+        ratios.append((node, ratio))
+
+    # Sort descending by ratio
+    ratios.sort(key=lambda x: x[1], reverse=True)
+
+    selected_nodes = set()
+    current_budget = 0
+
+    # Pick nodes until reaching budget
+    for node, ratio in ratios:
+        cost_of_node = graph.nodes[node][cost_attr]
+        if current_budget + cost_of_node > budget:
+            break
+        selected_nodes.add(node)
+        current_budget += cost_of_node
+
+    if return_budget_left:
+        budget_left = budget - current_budget
+        return selected_nodes, budget_left
+    else:
+        return selected_nodes
+    
+def choose_nodes_by_neighbors_cost_ascending_ratio_until_budget_naive_arch(graph, budget, cost_attr, return_budget_left=False):
+    # Collect (node, ratio) for all nodes, where ratio = sum_of_neighbor_costs / node_cost
+    ratios = []
+    for node in graph.nodes:
+        node_cost = graph.nodes[node][cost_attr]
+        neighbor_cost_sum = sum(graph.nodes[n][cost_attr] for n in graph.neighbors(node))
+        ratio = neighbor_cost_sum / node_cost if node_cost else float('inf')
+        ratios.append((node, ratio))
+
+    # Sort ascending by ratio
+    ratios.sort(key=lambda x: x[1])
+
+    selected_nodes = set()
+    current_budget = 0
+
+    # Pick nodes until reaching budget
+    for node, ratio in ratios:
+        cost_of_node = graph.nodes[node][cost_attr]
+        if current_budget + cost_of_node > budget:
+            break
+        selected_nodes.add(node)
+        current_budget += cost_of_node
+
+    if return_budget_left:
+        budget_left = budget - current_budget
+        return selected_nodes, budget_left
+    else:
+        return selected_nodes
+
 
 """
 Plotting Functions
